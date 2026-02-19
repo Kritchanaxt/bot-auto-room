@@ -107,7 +107,7 @@ graph TD
     E -- "✅ Slot Found" --> F["🖱️ Simulate Human Click"]
     F --> G{"📝 Form Loaded?"}
     
-    G -- "Yes" --> H["⌨️ Fill Data (Name, Phone, ID)"]
+    G -- "Yes" --> H["⌨️ Fill Data "]
     H --> I["🖱️ Attempt Final Confirmation"]
     
     I --> J{❓ Security Check}
