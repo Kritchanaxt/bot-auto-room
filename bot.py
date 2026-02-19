@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import re
+from datetime import datetime
 from playwright.async_api import async_playwright
 
 # Load environment variables from .env file
@@ -14,8 +15,29 @@ LAST_NAME = os.getenv("LAST_NAME")
 EMAIL = os.getenv("EMAIL")
 PHONE = os.getenv("PHONE")
 STUDENT_ID = os.getenv("STUDENT_ID")
-# Use the TARGET_URL from .env if available, or default to the hardcoded one (as a fallback)
+# Use the TARGET_URL from .env if available, or default to the hardcoded one
 TARGET_URL = os.getenv("TARGET_URL", "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ0oKeF_jNFvpWsuV4dtKOF4pHwOMZdVkAzTWsh_z3n2WNZsKOGuX3AUILZAuQ8y-FdfBwe_UPS-")
+
+def get_screenshot_path(name_suffix):
+    """
+    Generates a file path for screenshots organized by Date/Time.
+    Format: results/YYYY-MM-DD/HH-MM-SS_name_suffix.png
+    """
+    now = datetime.now()
+    # Create folder for "Today's Date" inside results/
+    date_folder = now.strftime("%Y-%m-%d")
+    base_dir = os.path.join("results", date_folder)
+    
+    # Ensure directory exists
+    os.makedirs(base_dir, exist_ok=True)
+    
+    # File name with Time
+    time_str = now.strftime("%H-%M-%S")
+    filename = f"{time_str}_{name_suffix}.png"
+    
+    full_path = os.path.join(base_dir, filename)
+    print(f"Saving screenshot to: {full_path}")
+    return full_path
 
 async def book_appointment():
     # Helper to check environment variables
@@ -37,104 +59,83 @@ async def book_appointment():
                 await page.wait_for_selector('div[role="main"]', timeout=30000)
             except:
                 print("Timeout waiting for page load.")
+                await page.screenshot(path=get_screenshot_path("page_load_timeout"))
 
-            print("Looking for available slots...")
-            
-            # Google Calendar Appointment Slots usually have buttons with times like "09:00" or simple "Book appointment"
-            # We look for buttons that have time patterns or aria-labels indicating availability.
-            # Strategy: Find all buttons that look like time slots.
-            # Usually: <div role="button" aria-label="10:00 AM - 11:00 AM, available">...</div>
-            
-            # Selector for buttons with time text. Google slots sometimes use div role="button"
-            time_slot_selector = 'div[role="button"][aria-label*=":"]' 
-            
-            # Wait for slot to appear
+            # Wait for network idle to ensure slots are loaded
             try:
-                await page.wait_for_selector(time_slot_selector, timeout=10000)
+                await page.wait_for_load_state('networkidle')
             except:
-                print("No slots found immediately.")
-            
-            # robustly check all potential buttons
-            slots = await page.locator(time_slot_selector).all()
+                pass
+
+            print("Scanning for slots...")
+            # This locator finds buttons that have text matching time pattern
+            slots = await page.locator('div[role="button"]').filter(has_text=re.compile(r"\d{1,2}:\d{2}")).all()
             
             available_slot = None
             if slots:
                 for slot in slots:
-                    label = await slot.get_attribute("aria-label") or ""
-                    is_disabled = await slot.get_attribute("aria-disabled")
-                    # Check if it's available (not disabled)
-                    if is_disabled != "true":
-                        print(f"Found available slot: {label}")
-                        available_slot = slot
-                        break
+                    if await slot.is_visible():
+                        label = await slot.get_attribute("aria-label") or await slot.inner_text()
+                        is_disabled = await slot.get_attribute("aria-disabled")
+                        
+                        # Verify it's not a navigation button (like < > for dates)
+                        # Time slots usually have ':' in their text or label
+                        # Also check if it's not disabled
+                        if label and ":" in label and is_disabled != "true":
+                            print(f"Found available slot: {label}")
+                            available_slot = slot
+                            break
             
-            if available_slot:
+            # Let's take a screenshot if no slots are found regardless of timeout
+            if not available_slot:
+                await page.screenshot(path=get_screenshot_path("no_slots_found"))
+                print("No slots found. Screenshot saved.")
+            else:
                 print("Clicking the first available slot...")
                 await available_slot.click()
-            else:
-                print("No available slots found on this page.")
-                await browser.close()
-                return
+                
+                # Wait for the booking form dialog/page
+                print("Waiting for booking form...")
+                await page.wait_for_selector('input[type="text"]', timeout=10000)
+                
+                # Fill Form
+                print("Filling form...")
+                await page.get_by_label("ชื่อ").fill(FIRST_NAME)
+                await page.get_by_label("นามสกุล").fill(LAST_NAME)
+                await page.get_by_label("อีเมล").fill(EMAIL)
+                await page.get_by_label("หมายเลขโทรศัพท์").fill(PHONE)
+                await page.get_by_label("รหัสนิสิต").fill(STUDENT_ID)
 
-            # Wait for the booking form dialog/page
-            print("Waiting for booking form...")
-            # The form usually appears in a modal or new page.
-            await page.wait_for_selector('input[type="text"]', timeout=10000)
-            
-            # Fill Form
-            print("Filling form...")
-            
-            # Name
-            await page.get_by_label("ชื่อ").fill(FIRST_NAME)
-            
-            # Last Name
-            await page.get_by_label("นามสกุล").fill(LAST_NAME)
-            
-            # Email
-            await page.get_by_label("อีเมล").fill(EMAIL)
-
-            # Phone
-            await page.get_by_label("หมายเลขโทรศัพท์").fill(PHONE)
-            
-            # Student ID
-            await page.get_by_label("รหัสนิสิต").fill(STUDENT_ID)
-
-            print("Form filled. Submitting...")
-            
-            # Click the "Book" button. Often labeled "จอง" in Thai.
-            # We look for a button with text "Book" or "จอง"
-            submit_button = page.get_by_role("button", name=re.compile(r"จอง|Book|Confirm|Schedule", re.IGNORECASE)).first
-            
-            if await submit_button.count() > 0: # Wait, .first returns locator, not count.
-                # Use is_visible check or count on the locator list
-                pass
-            
-            # Re-locate to be safe
-            submit_buttons = page.get_by_role("button", name=re.compile(r"จอง|Book|Confirm|Schedule", re.IGNORECASE))
-            if await submit_buttons.count() > 0:
-                await submit_buttons.first.click()
-                print("Clicked submit button.")
-            else:
-                # Fallback
-                buttons = page.locator('div[role="dialog"] button')
-                if await buttons.count() > 0:
-                    await buttons.last.click() 
-                    print("Clicked fallback submit button.")
+                print("Form filled. Submitting...")
+                
+                # Submit logic
+                submit_buttons = page.get_by_role("button", name=re.compile(r"จอง|Book|Confirm|Schedule", re.IGNORECASE))
+                if await submit_buttons.count() > 0:
+                    await submit_buttons.first.click()
+                    print("Clicked submit button.")
                 else:
-                    print("Submit button not found.")
-                    return
+                    # Fallback
+                    buttons = page.locator('div[role="dialog"] button')
+                    if await buttons.count() > 0:
+                        await buttons.last.click() 
+                        print("Clicked fallback submit button.")
+                    else:
+                        print("Submit button not found.")
+                        return
 
-            # Wait for confirmation screen
-            await page.wait_for_timeout(5000) 
-            
-            # Screenshot confirmation
-            await page.screenshot(path="confirmation.png")
-            print("Confirmation screenshot saved to confirmation.png")
+                # Wait for confirmation screen
+                await page.wait_for_timeout(5000) 
+                
+                # Screenshot confirmation
+                await page.screenshot(path=get_screenshot_path("confirmation"))
+                print("Confirmation screenshot saved.")
 
         except Exception as e:
             print(f"An error occurred: {e}")
-            await page.screenshot(path="error.png")
-            # We don't exit(1) in the finally block, but here capturing error is good.
+            try:
+                await page.screenshot(path=get_screenshot_path("error"))
+            except:
+                pass
         finally:
             await browser.close()
 
