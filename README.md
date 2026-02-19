@@ -80,6 +80,18 @@ To bypass standard bot detection, we implemented:
     -   Used broad logic to find buttons by Role, Text, Class, and specific attributes (`jsname`, `aria-label`).
     -   Implemented fallback search strategies (if Strategy A fails, try B, then C).
 
+## ☁️ Continuous Integration (CI) Deployment
+
+This project acts as a proof-of-concept for **Serverless Browser Automation** using GitHub Actions (`.github/workflows/booking.yml`).
+
+### How it operates in CI:
+1.  **Scheduled Execution**: Configured with CRON syntax to trigger automation scripts at varying intervals.
+2.  **Secure Configuration**: All sensitive operational parameters are injected via **Encrypted Secrets Management** (e.g., GitHub Secrets), adhering to DevSecOps best practices. No sensitive data is exposed in the codebase.
+3.  **Headless Environment**: The bot executes in a headless Linux environment (Ubuntu latest) within a container.
+4.  **Artifact Evidence**: Determining success/failure in a headless environment is hard. The workflow automatically uploads **Screenshots** (success or error) as build artifacts for post-run analysis.
+
+> **⚠️ Note on Cloud IPs**: Running automation from datacenter IPs (like GitHub Actions) significantly increases the "Bot Score" assigned by WAFs. While convenient, this method is more easily detected than running locally on a residential IP.
+
 ## ⚠️ Disclaimer
 This code is for **educational and research purposes only**. It demonstrates the capabilities and limitations of browser automation tools like Playwright. Attempting to bypass security measures on third-party services may violate their Terms of Service.
 
@@ -89,7 +101,7 @@ This code is for **educational and research purposes only**. It demonstrates the
 graph TD
     A["🚀 Start Experiment"] --> B{"⚙️ Load Anti-Detect Config"}
     B --> C["🌐 Launch Stealth Browser"]
-    C --> D["📅 Navigate to Target (Google Calendar)"]
+    C --> D["📅 Navigate to Target"]
     D --> E{"🔍 Scan for Time slots"}
     
     E -- "✅ Slot Found" --> F["🖱️ Simulate Human Click"]
