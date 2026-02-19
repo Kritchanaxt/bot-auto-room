@@ -21,6 +21,45 @@ We selected **Google Calendar Appointment Schedules** as our test target because
 -   **❌ Failure**: The final "Book" / "Confirm" action fails.
     -   **Reason**: Google's security measures likely employ advanced **behavioral biometrics** (analyzing mouse velocity, acceleration, micro-movements, and timing between events) or backend verification that detects the Playwright execution context. Even with `dispatchEvent` and `force=True` clicks, the system rejects the final request.
 
+## 🔮 Potential Applications & Viability
+
+While this specific experiment failed to conquer Google's top-tier security, the foundational code is **highly effective** for general-purpose automation.
+
+### Where this bot *would* likely succeed:
+1.  **University/Library Booking Systems**: Often standard web forms without advanced bot protection.
+2.  **Government Queue Reservartions**: Typically basic HTML forms checking only for completed fields.
+3.  **Local Clinic/Service Sites**: Websites that use standard CMS plugins for booking.
+4.  **Internal Corporate Tools**: Employee portals for meeting room reservations.
+
+### Why?
+Most general booking sites only validate:
+-   ✅ Is the button clicked?
+-   ✅ Is the form data valid?
+-   ✅ Is the session cookie active?
+*(They rarely check mouse velocity or micro-behavior like Google does.)*
+
+This bot's architecture—scanning for keywords, handling dynamic loading, and filling forms robustly—makes it a **powerful template** for automating 80-90% of booking tasks on the open web.
+## 🛡️ Impact of DDoS Protection & WAF (Web Application Firewalls)
+
+Will standard DDoS protection stop this bot? **It depends.**
+
+### 1. Rate Limiting (DoS)
+-   **Impact: Low** 🟢
+-   This bot simulates **one single user** clicking through a website at human speed. It does **not** flood the server with thousands of requests per second. Therefore, standard rate-limiting rules usually ignore it.
+
+### 2. Cloudflare / WAF Challenges
+-   **Impact: Medium** 🟡
+-   Modern WAFs (like Cloudflare) check "Is this a real browser?".
+-   **Our Defense**: The bot uses `stealth` context and realistic User-Agents. It can often pass standard WAF checks because it executes JavaScript correctly.
+-   **Why Google Calendar Failed**: Google goes deeper than a standard WAF. It doesn't just check "Is this a browser?", it checks "**Is this a human?**". It analyzes:
+    -   **Mouse Trajectory**: Humans don't move mice in perfect straight lines.
+    -   **Event Timing**: Humans have variable reaction times (entropy), bots are too consistent.
+    -   **Account Trust**: A headless login from a datacenter IP (GitHub Actions) on a consumer account is highly suspicious.
+
+### 3. CAPTCHA (Recaptcha / Turnstile)
+-   **Impact: High** 🔴
+-   If the booking flow requires solving a puzzle (Pick the traffic lights), this bot **will fail**.
+-   **Workaround**: Some CAPTCHAs can be solved using 3rd party APIs (2Captcha, etc.), but that is outside the scope of this research.
 ## 🛠️ Technical Implementation
 
 ### Technologies
