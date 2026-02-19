@@ -1,0 +1,40 @@
+name: Auto Booking Bot
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Runs every 15 minutes
+  workflow_dispatch:      # Allows manual trigger
+
+jobs:
+  book-appointment:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        playwright install chromium
+
+    - name: Run booking script
+      env:
+        FIRST_NAME: ${{ secrets.FIRST_NAME }}
+        LAST_NAME: ${{ secrets.LAST_NAME }}
+        EMAIL: ${{ secrets.EMAIL }}
+        PHONE: ${{ secrets.PHONE }}
+        STUDENT_ID: ${{ secrets.STUDENT_ID }}
+      run: python bot.py
+
+    - name: Upload screenshots (if any)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenshots
+        path: "*.png"
