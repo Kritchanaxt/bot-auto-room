@@ -1,0 +1,23 @@
+# Environment variables
+.env
+
+# Screenshots and logs
+results/
+*.png
+*.log
+debug_page_source.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Mac OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
